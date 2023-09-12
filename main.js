@@ -167,7 +167,7 @@ function getMaterialFromTexture(textureName) {
 }
 
 function createSphere() {
-    let randomScale = getRandomArbitrary(0.1, 0.3);
+    let randomScale = getRandomArbitrary(0.1, 0.1);
     // random material
     const random = Math.floor(Math.random() * materials.length);
 
@@ -204,13 +204,37 @@ function getRandomArbitrary(min, max) {
 function playSound(collision) {
     const impactStrength = collision.contact.getImpactVelocityAlongNormal();
 
-    if(impactStrength > 3) {
-        hitSound.volume = getRandomArbitrary(0.8, 1);   
-    } else if (impactStrength > 1) {
-        hitSound.volume = getRandomArbitrary(0.3, 0.8);
-    } else {
-        hitSound.volume = getRandomArbitrary(0.1, 0.3);
+    let int = parseInt(impactStrength);
+    let min = 0, max = 0;
+
+    switch(int) {
+        case 6:
+            min = 0.8;
+            max = 1;
+            break;
+        case 5:
+            min = 0.6;
+            max = 0.8;
+            break;
+        case 4:
+            min = 0.4;
+            max = 0.6;
+            break;
+        case 3:
+            min = 0.2;
+            max = 0.4;
+            break;
+        case 2:
+            min = 0.1;
+            max = 0.2;
+            break;
+        default:
+            min = 0.01;
+            max = 0.1;
     }
+
+    let volume = getRandomArbitrary(min, max);
+    hitSound.volume = volume;
     hitSound.currentTime = 0;
     hitSound.play();
 }
