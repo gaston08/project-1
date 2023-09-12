@@ -12,17 +12,29 @@ const obj = {
 gui.add(obj, 'createSphere').name('create sphere');
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(1.5, 2, 0);
+const camera = new THREE.PerspectiveCamera(95, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.set(1.5, 1.5, 0);
 
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
+//renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
 const light = new THREE.AmbientLight(0xffffff, 1);
+light.castShadow = true;
 scene.add(light);
 
 const directionalLight = new THREE.DirectionalLight(0xffffff, 5);
+directionalLight.castShadow = true;
+directionalLight.position.set(-4, 4, 2);
+directionalLight.shadow.mapSize.set(1024, 1024);
+directionalLight.shadow.camera.far = 15;
+directionalLight.shadow.camera.left = - 7;
+directionalLight.shadow.camera.top = 7;
+directionalLight.shadow.camera.right = 7;
+directionalLight.shadow.camera.bottom = - 7;
 scene.add(directionalLight);
 
 const controls = new OrbitControls( camera, renderer.domElement );
@@ -77,6 +89,7 @@ const geometry = new THREE.PlaneGeometry(10, 10, 10, 10);
 
 const plane = new THREE.Mesh(geometry, material);
 plane.rotation.x = -Math.PI / 2;
+plane.receiveShadow = true;
 
 scene.add(plane);
 
@@ -167,12 +180,13 @@ function getMaterialFromTexture(textureName) {
 }
 
 function createSphere() {
-    let randomScale = getRandomArbitrary(0.1, 0.1);
+    let randomScale = getRandomArbitrary(0.1, 0.3);
     // random material
     const random = Math.floor(Math.random() * materials.length);
 
     const sphereGeometry = new THREE.SphereGeometry(randomScale, 100, 100);
     const mesh = new THREE.Mesh(sphereGeometry, materials[random]);
+    mesh.castShadow = true;
     
     const body = new CANNON.Body({
         mass: randomScale,
