@@ -1,8 +1,19 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import * as CANNON from 'cannon-es';
+import GUI from 'lil-gui';
+
+const hitSound = new Audio('/sounds/hit.mp3')
+
+const gui = new GUI();
+const obj = {
+    createSphere,
+}
+gui.add(obj, 'createSphere').name('create sphere');
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.set(1.5, 2, 0);
 
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -14,20 +25,8 @@ scene.add(light);
 const directionalLight = new THREE.DirectionalLight(0xffffff, 5);
 scene.add(directionalLight);
 
-
-//const pointLight = new THREE.PointLight(0xffffff, 30, 0);
-//pointLight.position.set(-3, 3, -3);
-//scene.add(pointLight);
-//
-//const sphereSize = 1;
-//const pointLightHelper = new THREE.PointLightHelper( pointLight, sphereSize );
-//scene.add( pointLightHelper );
-
 const controls = new OrbitControls( camera, renderer.domElement );
-//const size = 10;
-//const divisions = 10;
-//const gridHelper = new THREE.GridHelper(size, divisions);
-//scene.add(gridHelper);
+controls.update();
 
 // three loader
 const loadingManager = new THREE.LoadingManager();
@@ -81,18 +80,137 @@ plane.rotation.x = -Math.PI / 2;
 
 scene.add(plane);
 
-const sphereGeometry = new THREE.SphereGeometry(0.5, 100, 100);
-const sphere = new THREE.Mesh(sphereGeometry, material);
-sphere.position.y = 0.5;
-sphere.position.x = 1;
-scene.add(sphere);
 
-camera.position.set(1.5, 1, 0);
-controls.update();
+// physic world
+// Setup our physics world
+const world = new CANNON.World({
+    gravity: new CANNON.Vec3(0, -9.82, 0), // m/s²
+});
+
+world.allowSleep = true;
+world.broadphase = new CANNON.SAPBroadphase(world);
+
+// Default material
+const defaultMaterial = new CANNON.Material('default');
+const defaultContactMaterial = new CANNON.ContactMaterial(
+    defaultMaterial,
+    defaultMaterial,
+    {
+        friction: 0.1,
+        restitution: 0.7
+    }
+);
+world.defaultContactMaterial = defaultContactMaterial;
+
+// Create a static plane for the ground
+const groundBody = new CANNON.Body({
+    type: CANNON.Body.STATIC, // can also be achieved by setting the mass to 0
+    shape: new CANNON.Plane(),
+});
+groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+world.addBody(groundBody);
+// end
+
+/**
+ * create spheres
+ */
+const spheres = [];
+const lapisLazuliMaterial = getMaterialFromTexture('lapis_lazuli');
+const malachiteMaterial = getMaterialFromTexture('malachite');
+const tigerEyeGemMaterial = getMaterialFromTexture('tiger_eye_gem');
+const materials = [
+    lapisLazuliMaterial,
+    malachiteMaterial,
+    tigerEyeGemMaterial,
+]
 
 function animate() {
+
+    world.fixedStep();
+
+    for (let sphere of spheres) {
+        sphere.mesh.position.copy(sphere.body.position);
+        sphere.mesh.quaternion.copy(sphere.body.quaternion);
+    }
+
 	requestAnimationFrame(animate);
 
 	renderer.render(scene, camera);
 }
 animate();
+
+function getMaterialFromTexture(textureName) {
+    const texture = textureLoader.load(`/balls/${textureName}/basecolor.jpg`);
+    texture.repeat.set(1, 1);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+
+    texture.generateMipmaps = false;
+    texture.minFilter = THREE.NearestFilter;
+    texture.magFilter = THREE.NearestFilter;
+
+    const textureNormal = textureLoader.load(`/balls/${textureName}/normal.jpg`);
+    const textureRoughness = textureLoader.load(`/balls/${textureName}/roughness.jpg`);
+    const textureAO = textureLoader.load(`/balls/${textureName}/ao.jpg`);
+    const textureHeight = textureLoader.load(`/balls/${textureName}/height.png`);
+
+    const material = new THREE.MeshStandardMaterial({ 
+        map: texture,
+    });
+
+    material.normalMap = textureNormal;
+    material.roughnessMap = textureRoughness;
+    material.aoMap = textureAO;
+    material.bumpMap = textureHeight;
+
+    return material;
+}
+
+function createSphere() {
+    let randomScale = getRandomArbitrary(0.1, 0.3);
+    // random material
+    const random = Math.floor(Math.random() * materials.length);
+
+    const sphereGeometry = new THREE.SphereGeometry(randomScale, 100, 100);
+    const mesh = new THREE.Mesh(sphereGeometry, materials[random]);
+    
+    const body = new CANNON.Body({
+        mass: randomScale,
+        shape: new CANNON.Sphere(randomScale),
+        material: defaultMaterial,
+        position: new CANNON.Vec3(
+            getRandomArbitrary(-1, 1),
+            2,
+            getRandomArbitrary(-1, 1),
+        )
+    });
+    body.allowSleep = true;
+
+    body.addEventListener('collide', playSound);
+
+    scene.add(mesh);
+    world.addBody(body);
+
+    spheres.push({
+        mesh,
+        body
+    })
+}
+
+function getRandomArbitrary(min, max) {
+    return Math.random() * (max - min) + min;
+}
+
+function playSound(collision) {
+    const impactStrength = collision.contact.getImpactVelocityAlongNormal();
+
+    if(impactStrength > 3) {
+        hitSound.volume = getRandomArbitrary(0.8, 1);   
+    } else if (impactStrength > 1) {
+        hitSound.volume = getRandomArbitrary(0.3, 0.8);
+    } else {
+        hitSound.volume = getRandomArbitrary(0.1, 0.3);
+    }
+    hitSound.currentTime = 0;
+    hitSound.play();
+}
